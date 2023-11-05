@@ -1,4 +1,3 @@
-import dash_ag_grid as dag
 import dash
 from dash import Dash, html, dcc, Input, Output, State, callback, dash_table
 import dash_bootstrap_components as dbc
@@ -46,6 +45,45 @@ external_stylesheets = [dbc.themes.SPACELAB, dbc.icons.BOOTSTRAP]
 app = Dash(__name__, external_stylesheets = external_stylesheets)
 app.title= 'PMIM Dashboard'
 
+# the style arguments for the sidebar. We use position:fixed and a fixed width
+SIDEBAR_STYLE = {
+    "position": "relative",
+    "top": 0,
+    "left": 0,
+    "bottom": 0,
+    "width": "auto",
+    "padding": "2rem 1rem",
+    "background-color": "#f8f9fa",
+}
+
+# the styles for the main content position it to the right of the sidebar and
+# add some padding.
+CONTENT_STYLE = {
+    "margin-left": "1rem",
+    "margin-right": "1rem",
+    "padding": "2rem 1rem",
+}
+
+sidebar = html.Div(
+    [
+        html.H2("Sidebar", className="display-4"),
+        html.Hr(),
+        html.P(
+            "A simple sidebar layout with navigation links", className="lead"
+        ),
+        dbc.Nav(
+            [
+                dbc.NavLink("Home", href="/", active="exact"),
+                dbc.NavLink("Page 1", href="/page-1", active="exact"),
+                dbc.NavLink("Page 2", href="/page-2", active="exact"),
+            ],
+            vertical=True,
+            pills=True,
+        ),
+    ],
+    style=SIDEBAR_STYLE,
+)
+
 
 
 banner = dbc.Card(
@@ -54,13 +92,16 @@ banner = dbc.Card(
             html.H1('PMIM Interactive Dashboard'),
             html.H5('Predictive Maintenance Industrial Machines')
         ], 
-    ),
+    ), color="success", inverse=True,
     className='text-center bg-secondary text-light border border-3 align-self-center'
 )
 
-dropdown = dcc.Dropdown(id = 'dropdown',
+dropdown_1 = dcc.Dropdown(id = 'dropdown-1',
                         options= ['volt', 'rotate', 'pressure', 'vibration'],
                         value = 'volt', clearable= False)
+dropdown_2 = dcc.Dropdown(id = 'dropdown-2',
+                        options= ['errorID', 'failure'],
+                        value = 'errorID', clearable= False)
 inputNum = dcc.Input(id= 'machine_id', type= "number", value= 1, min= 1, max = 100)
 
 
@@ -107,7 +148,7 @@ card1 = dbc.Card(
                 modal2
             ]
         ),
-    ],
+    ], color="danger", inverse=True,
     className='text-center m-4'
 )
 card2 = dbc.Card(
@@ -119,7 +160,7 @@ card2 = dbc.Card(
                 modal1,
             ]
         ),       
-    ],
+    ], color="danger", inverse=True,
     className='text-center m-4'
 )
 card3 = dbc.Card(
@@ -131,7 +172,7 @@ card3 = dbc.Card(
                 html.Div(id = "model_mac"),
             ]
         ),       
-    ],
+    ], color="info", inverse=True,
     className='text-center m-4'
 )
 card4 = dbc.Card(
@@ -143,18 +184,11 @@ card4 = dbc.Card(
                 html.Div(id = 'age_mac'),
             ]
         ),       
-    ],
+    ], color="info", inverse=True,
     className='text-center m-4'
 )
 
-
-# Define the layout of the app
-app.layout = dbc.Container([
-    dbc.Row(banner),
-    dbc.Row([
-        # to be used as a sidebar
-        dbc.Col(html.Div("stuff", className="bg-secondary h-100"), width=2),
-        dbc.Col([
+content_1 = html.Div([
             dbc.Row([
                 dbc.Col(card1),
                 dbc.Col(card2),
@@ -162,20 +196,30 @@ app.layout = dbc.Container([
                 dbc.Col(card4)                
             ]),
             dbc.Row([
-                dbc.Col([dbc.Card(dropdown)]),
+                dbc.Col([dbc.Card(dropdown_1)]),
+                dbc.Col([dbc.Card(dropdown_2)]),
                 dbc.Col([dbc.Card(inputNum)])
             ]),
             dbc.Row([
-                dbc.Col([dbc.Card(dcc.Graph(id= 'graph1'),style={'height':400}),
-                         dbc.Card(dcc.Graph(figure=fig2),style={'height':400})], width=6),
+                dbc.Col([dbc.Card(dcc.Graph(id= 'graph1'),style={'height':300}),
+                         dbc.Card(dcc.Graph(id = 'graph4'),style={'height':300})], width=6),
                 # dbc.Col([dbc.Card(px.pie(df, values= 'age', names= 'machineID'))]),            
             ]),
-        ], width=10),
+        ], style=CONTENT_STYLE)
+# Define the layout of the app
+app.layout = dbc.Container([
+    dbc.Row(banner),
+    dbc.Row([
+        # to be used as a sidebar
+        dbc.Col(html.Div([dcc.Location(id="url"), sidebar])),
+        dbc.Col(content_1, width=10),
     ], className='p-2 align-items-stretch')
 ], fluid=True)
 
 @app.callback(
-    [Output("graph1", "figure"),    
+    [
+    Output("graph1", "figure"), 
+    Output("graph4", "figure"),   
     Output("age_mac", "children"), 
     Output("age_title", "children"),
     Output("model_mac", "children"), 
@@ -183,24 +227,43 @@ app.layout = dbc.Container([
     Output("failure_title", "children"),
     Output("error_title", "children")
     ], 
-    [Input("dropdown", "value"),    
-    Input("machine_id", "value"),]    
+    [Input("url", "pathname"),
+    Input("dropdown-1", "value"),
+    Input("dropdown-2", "value"),    
+    Input("machine_id", "value"),]
+    )
+def render_page_content(pathname,value, type, id):
+    if pathname == "/":
+        #subset the data frame based on the entered machineID
+        dff = df.loc[df["machineID"] == id]
+        a = dff["age"].unique()
+        a= a[0]
+        b = dff["model"].unique()
+        b = b[0]
+        c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
+        d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
+            
+        df_type = pd.DataFrame(d) if type == "errorID" else pd.DataFrame(c)
+            
+        df_failure = pd.DataFrame(c)
+        df_error = pd.DataFrame(d)
+        count_df_failure = df_failure.shape[0]
+        count_df_error = df_error.shape[0]
+        return px.line(dff, x = 'datetime', y = value), px.bar(df_type, x = type),  html.P(f'The machine ID {id}  is {a}  years old'), html.P(f'{a}'), html.P(f'The machine ID {id} is {b}'), html.P(f'{b}'), html.P(f'{count_df_failure}'), html.P(f'{count_df_error}')
+    elif pathname == "/page-1":
+        return html.P("This is the content of page 1. Yay!")
+    elif pathname == "/page-2":
+        return html.P("Oh cool, this is page 2!")
+    # If the user tries to reach a different page, return a 404 message
+    return html.Div(
+        [
+            html.H1("404: Not found", className="text-danger"),
+            html.Hr(),
+            html.P(f"The pathname {pathname} was not recognised..."),
+        ],
+        className="p-3 bg-light rounded-3",
     )
 
-def generate_chart(value, id):
-    #subset the data frame based on the entered machineID
-    dff = df.loc[df["machineID"] == id]
-    a = dff["age"].unique()
-    a= a[0]
-    b = dff["model"].unique()
-    b = b[0]
-    c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
-    d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
-    df_failure = pd.DataFrame(c)
-    df_error = pd.DataFrame(d)
-    count_df_failure = df_failure.shape[0]
-    count_df_error = df_error.shape[0]
-    return px.line(dff, x = 'datetime', y = value), html.P(f'The machine ID {id}  is {a}  years old'), html.P(f'{a}'), html.P(f'The machine ID {id} is {b}'), html.P(f'{b}'), html.P(f'{count_df_failure}'), html.P(f'{count_df_error}')
 
 @app.callback(
     Output("modal-fs-1", "is_open"),  
@@ -234,7 +297,7 @@ def data_table(id):
 @app.callback(
     Output("graph2", "figure"),
     [Input("machine_id", "value"), 
-    Input("dropdown", "value")]    
+    Input("dropdown-1", "value")]    
 )
 
 def data_table(id, variable):
@@ -291,7 +354,7 @@ def data_table(id):
 @app.callback(
     Output("graph3", "figure"),
     [Input("machine_id", "value"), 
-    Input("dropdown", "value")]    
+    Input("dropdown-1", "value")]    
 )
 
 def data_table(id, variable):
