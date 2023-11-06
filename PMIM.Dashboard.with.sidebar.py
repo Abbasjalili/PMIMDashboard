@@ -1,57 +1,35 @@
+"""
+This app creates a simple sidebar layout using inline style arguments and the
+dbc.Nav component.
+
+dcc.Location is used to track the current location, and a callback uses the
+current location to render the appropriate page content. The active prop of
+each NavLink is set automatically according to the current pathname. To use
+this feature you must install dash-bootstrap-components >= 0.11.0.
+
+For more details on building multi-page Dash applications, check out the Dash
+documentation: https://dash.plot.ly/urls
+"""
 import dash
-from dash import Dash, html, dcc, Input, Output, State, callback, dash_table
+from dash import html, dcc, Input, Output, State, callback, dash_table
 import dash_bootstrap_components as dbc
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
 
-
-
-# df1 = pd.read_csv('Data\\PdM_errors.csv')
-# df2 = pd.read_csv('Data\\PdM_telemetry.csv')
-# df3 = pd.read_csv('Data\\PdM_failures.csv')
-# df4 = pd.read_csv('Data\\PdM_machines.csv')
-# df5 = pd.read_csv('Data\\PdM_maint.csv')
-
-
-# output1 = pd.merge(df2, df1, on=['datetime','machineID'],how='left')
-# output2 = pd.merge(output1, df3, on=['datetime','machineID'],how='left')
-# output3 = pd.merge(output2, df5, on=['datetime','machineID'],how='left')
-# merged_data = pd.merge(output3, df4, on=['machineID'],how='left')
-
-# merged_data = merged_data.replace(np.nan, 0)
-# merged_data = merged_data.groupby(['machineID','datetime']).max()
-# merged_data=merged_data.reset_index()
-# merged_data.to_csv('Data/merged_data.csv', index=False)
-
-
-# Create the Dash app
-# app = dash.Dash(
-#     __name__,
-#     external_stylesheets=[dbc.themes.BOOTSTRAP],
-#     meta_tags=[{'name': 'viewport', 'content': 'width=device-width, initial-scale=1'}]
-# )
+app = dash.Dash(external_stylesheets=[dbc.themes.BOOTSTRAP])
 
 # Read the CSV file into a DataFrame
 df = pd.read_csv('Data\\merged_data.csv')
 
-
-external_stylesheets = [dbc.themes.SPACELAB, dbc.icons.BOOTSTRAP]
-
-
-# Create the Dash app
-app = Dash(__name__, external_stylesheets = external_stylesheets)
-app.title= 'PMIM Dashboard'
-
 # the style arguments for the sidebar. We use position:fixed and a fixed width
 SIDEBAR_STYLE = {
-    "position": "relative",
+    "position": "fixed",
     "top": 0,
     "left": 0,
     "bottom": 0,
-    "width": "auto",
+    "width": "16rem",
     "padding": "2rem 1rem",
     "background-color": "#f8f9fa",
 }
@@ -59,17 +37,17 @@ SIDEBAR_STYLE = {
 # the styles for the main content position it to the right of the sidebar and
 # add some padding.
 CONTENT_STYLE = {
-    "margin-left": "1rem",
-    "margin-right": "1rem",
+    "margin-left": "10rem",
+    "margin-right": "2rem",
     "padding": "2rem 1rem",
 }
 
 sidebar = html.Div(
     [
-        html.H2("Sidebar", className="display-4"),
+        html.H2("PMIM", className="display-4"),
         html.Hr(),
         html.P(
-            "A simple sidebar layout with navigation links", className="lead"
+            "Fully interactive dashboard", className="lead"
         ),
         dbc.Nav(
             [
@@ -82,18 +60,6 @@ sidebar = html.Div(
         ),
     ],
     style=SIDEBAR_STYLE,
-)
-
-
-
-banner = dbc.Card(
-    dbc.CardBody(
-        [
-            html.H1('PMIM Interactive Dashboard'),
-            html.H5('Predictive Maintenance Industrial Machines')
-        ], 
-    ), color="success", inverse=True,
-    className='text-center bg-secondary text-light border border-3 align-self-center'
 )
 
 dropdown_1 = dcc.Dropdown(id = 'dropdown-1',
@@ -187,7 +153,8 @@ card4 = dbc.Card(
     className='text-center m-4'
 )
 
-content = html.Div([
+content = html.Div(id="page-content", style=CONTENT_STYLE)
+home = html.Div([
             dbc.Row([
                 dbc.Col(card1),
                 dbc.Col(card2),
@@ -200,75 +167,22 @@ content = html.Div([
                 dbc.Col([dbc.Card(inputNum)])
             ]),
             dbc.Row([
-                dbc.Col([dbc.Card(dcc.Graph(id= 'graph1'),style={'height':300}),
-                         dbc.Card(dcc.Graph(id = 'graph4'),style={'height':300})], width=6),
-                # dbc.Col([dbc.Card(px.pie(df, values= 'age', names= 'machineID'))]),            
+                dbc.Col([dbc.Card(dcc.Graph(id= 'graph1'),style={'height':400}),
+                         dbc.Card(dcc.Graph(id = 'graph4'),style={'height':400})], width=6),
+                dbc.Col([dbc.Card(dcc.Graph(id= 'graph-3',style={'height':800}))], width=6),            
             ]),
         ], id = "content-1", style=CONTENT_STYLE)
+# ML_page = 
 
-# Define the layout of the app
-app.layout = dbc.Container([
-    dbc.Row(banner),
-    dbc.Row([
-        # to be used as a sidebar
-        dbc.Col(html.Div([dcc.Location(id="url"), sidebar])),
-        dbc.Col(content, width=10),
-    ], className='p-2 align-items-stretch')
-], fluid=True)
+app.layout = html.Div([dcc.Location(id="url"), sidebar, content])
 
-@app.callback(
-    [Output("graph1", "figure"), 
-    Output("graph4", "figure"),   
-    Output("age_mac", "children"), 
-    Output("age_title", "children"),
-    Output("model_mac", "children"), 
-    Output("model_title", "children"),
-    Output("failure_title", "children"),
-    Output("error_title", "children")
-    ], 
-    [Input("url", "pathname"),
-    Input("dropdown-1", "value"),
-    Input("dropdown-2", "value"),    
-    Input("machine_id", "value"),]
-    )
-def render_page_content(pathname,value, type, id):
+#callback() for controlling sidebar:
+@app.callback(Output("page-content", "children"), [Input("url", "pathname")])
+def render_page_content(pathname):
     if pathname == "/":
-        #subset the data frame based on the entered machineID
-        dff = df.loc[df["machineID"] == id]
-        a = dff["age"].unique()
-        a= a[0]
-        b = dff["model"].unique()
-        b = b[0]
-        c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
-        d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
-        df_failure = pd.DataFrame(c)
-        df_error = pd.DataFrame(d)
-        
-        count_df_failure = df_failure.shape[0]
-        count_df_error = df_error.shape[0]
-        
-        df_type = df_error.sort_values(by=['errorID']) if type == "errorID" else df_failure.sort_values(by=['failure'])
-            
-        
-        
-        return px.line(dff, x = 'datetime', y = value), px.bar(df_type, x = type),  html.P(f'The machine ID {id}  is {a}  years old'), html.P(f'{a}'), html.P(f'The machine ID {id} is {b}'), html.P(f'{b}'), html.P(f'{count_df_failure}'), html.P(f'{count_df_error}')
+        return home
     elif pathname == "/page-1":
-        #subset the data frame based on the entered machineID
-        dff = df.loc[df["machineID"] == id]
-        a = dff["age"].unique()
-        a= a[0]
-        b = dff["model"].unique()
-        b = b[0]
-        c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
-        d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
-        df_failure = pd.DataFrame(c)
-        df_error = pd.DataFrame(d)
-        
-        count_df_failure = df_failure.shape[0]
-        count_df_error = df_error.shape[0]
-        
-        df_type = df_error.sort_values(by=['errorID']) if type == "errorID" else df_failure.sort_values(by=['failure'])
-        return  px.line(dff, x = 'datetime', y = value), px.bar(df_type, x = type),  html.P(f'The machine ID {id}  is {a}  years old'), html.P(f'{a}'), html.P(f'The machine ID {id} is {b}'), html.P(f'{b}'), html.P(f'{count_df_failure}'), html.P(f'{count_df_error}')
+        return html.P("This is the content of page 1. Yay!")
     elif pathname == "/page-2":
         return html.P("Oh cool, this is page 2!")
     # If the user tries to reach a different page, return a 404 message
@@ -280,6 +194,68 @@ def render_page_content(pathname,value, type, id):
         ],
         className="p-3 bg-light rounded-3",
     )
+
+
+#callback() for home page graphs:
+@app.callback(
+    [Output("graph1", "figure"), 
+    Output("graph4", "figure"),
+    Output("graph-3", "figure"),   
+    ], 
+    [Input("dropdown-1", "value"),
+    Input("dropdown-2", "value"),    
+    Input("machine_id", "value"),]
+    )
+def render_page_graphs(value, type, id):
+    #subset the data frame based on the entered machineID
+    dff = df.loc[df["machineID"] == id]
+    a = dff["age"].unique() 
+    a = a[0]
+    b = dff["model"].unique()
+    b = b[0]
+    c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
+    d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
+    e = pd.DataFrame(d.groupby(["errorID"], as_index=False)["machineID"].count())
+    
+    df_failure = pd.DataFrame(c)
+    df_error = pd.DataFrame(d)
+        
+            
+    df_type = df_error.sort_values(by=['errorID']) if type == "errorID" else df_failure.sort_values(by=['failure'])
+    
+    
+    return px.line(dff, x = 'datetime', y = value), px.bar(df_type, x = type), px.pie(e, values= 'machineID', names= 'errorID') 
+
+# callback() for cards titles:
+@app.callback(
+    [Output("age_mac", "children"), 
+    Output("age_title", "children"),
+    Output("model_mac", "children"), 
+    Output("model_title", "children"),
+    Output("failure_title", "children"),
+    Output("error_title", "children")
+    ], 
+    Input("machine_id", "value"),
+    )
+def render_page_components(id):
+    #subset the data frame based on the entered machineID
+    dff = df.loc[df["machineID"] == id]
+    a = dff["age"].unique()
+    a= a[0]
+    b = dff["model"].unique()
+    b = b[0]
+    c = df.loc[(df["machineID"] == id) & (df["failure"] != "0")]
+    d = df.loc[(df["machineID"] == id) & (df["errorID"] != "0")]
+    
+    
+    df_failure = pd.DataFrame(c)
+    df_error = pd.DataFrame(d)
+        
+    count_df_failure = df_failure.shape[0]
+    count_df_error = df_error.shape[0]
+        
+    return html.P(f'The machine ID {id}  is {a}  years old'), html.P(f'{a}'), html.P(f'The machine ID {id} is {b}'), html.P(f'{b}'), html.P(f'{count_df_failure}'), html.P(f'{count_df_error}')
+
 
 
 @app.callback(
@@ -334,9 +310,8 @@ def data_table(id, variable):
             
         dfff["colorCode"] = dfff["failure"].apply(condition)                
         fig =  px.line(dfff, x = 'datetime', y = variable)
-        fig.add_trace(go.Scatter(mode="markers", x=dff["datetime"], y=dff[variable], name="Failure Date"))
-        fig.update_traces(marker=dict(size=12, color = dfff["colorCode"],line=dict(width=2, color='DarkSlateGrey')),
-                          selector=dict(mode='markers'))
+        fig.add_trace(go.Scatter(mode="markers", x=dff["datetime"], y=dff[variable], name="Failure Date",
+                                 marker=dict(size=12, color = dfff["colorCode"],line=dict(width=2, color='DarkSlateGrey'))))
         return fig
     
 @app.callback(
@@ -396,10 +371,9 @@ def data_table(id, variable):
         fig =  px.line(dfff, x = 'datetime', y = variable)
         fig.add_trace(go.Scatter(mode="markers", x=dff["datetime"], y=dff[variable], name= "errorID date",
                                  marker=dict(size=12, color = dfff["colorCode"],line=dict(width=2, color='DarkSlateGrey'))))
-        # fig.update_traces(marker=dict(size=12, line=dict(width=2, color='DarkSlateGrey')),
-        #                   selector=dict(mode='markers'))
+        
         return fig
 
-# Run the app
-if __name__ == '__main__':
-    app.run_server(debug=True)
+    
+if __name__ == "__main__":
+    app.run_server(port=8888)
